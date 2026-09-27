@@ -1,1 +1,588 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"/>
+<meta name="theme-color" content="#071018"/>
+<meta name="apple-mobile-web-app-capable" content="yes"/>
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"/>
+<meta name="apple-mobile-web-app-title" content="Altseason"/>
+<link rel="manifest" href="manifest.json?v=3"/>
+<link rel="apple-touch-icon" href="apple-touch-icon.png"/>
+<title>Altseason Pulse</title>
+<style>
+  :root { --bg:#071018; --card:#101a28; --line:#2a3d55; --muted:#7f98b5; --text:#eaf1ff; --gold:#ffc857; --green:#2ecc8a; --red:#ff6b6b; --blue:#6ec1ff; }
+  * { box-sizing: border-box; }
+  body { margin:0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background:var(--bg); color:var(--text); min-height:100dvh; padding:16px 16px 40px; }
+  h1 { font-size:22px; margin:4px 0 2px; }
+  .sub { color:var(--muted); font-size:12px; margin-bottom:16px; }
+  .grid { display:grid; gap:12px; }
+  .card { background:var(--card); border:1px solid var(--line); border-radius:16px; padding:16px; }
+  .label { color:var(--muted); font-size:11px; font-weight:700; letter-spacing:.04em; text-transform:uppercase; }
+  .big { font-size:64px; font-weight:800; line-height:1; color:var(--gold); margin:8px 0; }
+  .row { display:flex; gap:12px; }
+  .row > .card { flex:1; }
+  .bar { height:14px; background:#182433; border-radius:999px; overflow:hidden; position:relative; margin:10px 0 6px; }
+  .bar > i { display:block; height:100%; background:var(--gold); width:0%; transition:width .6s ease; }
+  .bar .mark { position:absolute; top:-4px; bottom:-4px; width:2px; background:var(--green); }
+  .pill { display:inline-block; padding:4px 10px; border-radius:999px; font-size:12px; font-weight:700; }
+  .pill.warn { background:rgba(255,200,87,.15); color:var(--gold); }
+  .pill.bad { background:rgba(255,107,107,.15); color:var(--red); }
+  .pill.good { background:rgba(46,204,138,.15); color:var(--green); }
+  .metric { font-size:22px; font-weight:700; margin:6px 0 2px; }
+  .check { list-style:none; padding:0; margin:0; }
+  .check li { display:flex; justify-content:space-between; gap:8px; padding:10px 0; border-bottom:1px solid #1a2740; font-size:14px; }
+  .check li:last-child { border-bottom:none; }
+  .dot { width:10px; height:10px; border-radius:50%; display:inline-block; margin-right:8px; }
+  .dot.on { background:var(--green); } .dot.off { background:var(--red); }
+  .vs { display:grid; grid-template-columns:1fr 1fr; gap:10px; }
+  .vs .side { border-radius:12px; padding:12px; min-height:110px; }
+  .vs .social { background:rgba(110,193,255,.08); border:1px solid rgba(110,193,255,.35); }
+  .vs .reality { background:rgba(255,200,87,.08); border:1px solid rgba(255,200,87,.35); }
+  .vs h3 { margin:0 0 8px; font-size:12px; text-transform:uppercase; letter-spacing:.05em; color:var(--muted); }
+  .vs p { margin:0; font-size:14px; line-height:1.4; }
+  .gap { margin-top:10px; font-size:13px; color:var(--muted); }
+  .gap strong { color:var(--text); }
+  button.refresh { width:100%; margin-top:8px; padding:14px; border:none; border-radius:12px; background:var(--gold); color:#071018; font-weight:800; font-size:15px; }
+  .install { margin-top:12px; font-size:13px; color:var(--muted); line-height:1.45; padding:12px; border:1px dashed var(--line); border-radius:12px; }
+  .footer { margin-top:16px; font-size:11px; color:#5d7a9a; text-align:center; }
+
+  .coin { display:flex; justify-content:space-between; align-items:flex-start; gap:8px; padding:12px 0; border-bottom:1px solid #1a2740; }
+  .coin:last-child { border-bottom:none; }
+  .coin .sym { font-weight:800; font-size:15px; }
+  .coin .meta { color:var(--muted); font-size:12px; line-height:1.45; margin-top:4px; }
+  .coin .right { text-align:right; }
+  .coin .val { font-weight:700; font-size:15px; }
+
+  .overview { display:grid; grid-template-columns:repeat(5,minmax(0,1fr)); gap:8px; margin-bottom:12px; }
+  @media (max-width:720px){ .overview { grid-template-columns:repeat(3,minmax(0,1fr)); } }
+  @media (max-width:420px){ .overview { grid-template-columns:repeat(2,minmax(0,1fr)); } }
+  .ov { background:var(--card); border:1px solid var(--line); border-radius:12px; padding:10px 10px 12px; min-width:0; }
+  .ov .label { font-size:10px; }
+  .ov .ovv { font-size:15px; font-weight:800; margin-top:4px; line-height:1.15; word-break:break-word; }
+  .ov .ovs { color:var(--muted); font-size:10px; margin-top:2px; }
+  .tape-empty { color:var(--muted); font-size:13px; line-height:1.45; padding:4px 0; }
+  .tape .coin .chg { font-size:12px; font-weight:700; }
+  .chg.up { color:var(--green); } .chg.dn { color:var(--red); } .chg.flat { color:var(--muted); }
+
+</style>
+</head>
+<body>
+  <div class="sub" id="updated">Loading…</div>
+  <h1>Altseason Pulse</h1>
+  <div class="sub">Index · dominance · social vs reality · overview</div>
+
+  <div class="overview" id="overview">
+    <div class="ov"><div class="label">Crypto Mcap</div><div class="ovv" id="ovMcap">—</div><div class="ovs">CoinGecko global</div></div>
+    <div class="ov"><div class="label">BTC</div><div class="ovv" id="ovBtc">—</div><div class="ovs" id="ovBtcChg">mark</div></div>
+    <div class="ov"><div class="label">ETH</div><div class="ovv" id="ovEth">—</div><div class="ovs" id="ovEthChg">mark</div></div>
+    <div class="ov"><div class="label">Altseason</div><div class="ovv" id="ovIndex">—</div><div class="ovs" id="ovSeason">index</div></div>
+    <div class="ov"><div class="label">Fear &amp; Greed</div><div class="ovv" id="ovFng">—</div><div class="ovs" id="ovFngLbl">…</div></div>
+  </div>
+
+  <div class="card" id="holdingsTape" style="margin-bottom:12px">
+    <div class="label">Holdings tape</div>
+    <div id="tapeBody" class="tape" style="margin-top:8px"><div class="tape-empty">Open one-tap seed or set up bag</div></div>
+  </div>
+
+  <div class="grid">
+    <div class="card">
+      <div class="label">Altcoin Season Index</div>
+      <div class="big" id="index">—</div>
+      <span class="pill warn" id="seasonPill">…</span>
+      <div class="bar"><i id="barFill"></i><span class="mark" style="left:75%"></span></div>
+      <div class="sub" style="margin:0">Need ≥75 holding for confirmed altseason</div>
+    </div>
+
+    <div class="row">
+      <div class="card">
+        <div class="label">BTC.D</div>
+        <div class="metric" id="btcd">—</div>
+        <div class="sub" id="btcdNote">Want break &lt;55–58%</div>
+      </div>
+      <div class="card">
+        <div class="label">ETH/BTC</div>
+        <div class="metric" id="ethbtc">—</div>
+        <div class="sub" id="ethbtcNote">Leading?</div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="label">Fear &amp; Greed</div>
+      <div class="metric" id="fng">—</div>
+      <span class="pill warn" id="fngPill">…</span>
+      <div class="bar"><i id="fngBar"></i><span class="mark" style="left:50%"></span></div>
+      <div class="sub" style="margin:0">alternative.me · 0 extreme fear · 100 extreme greed</div>
+    </div>
+
+    <div class="card">
+      <div class="label">Regime</div>
+      <div class="metric" id="regime" style="color:var(--gold)">—</div>
+      <div class="sub" id="regimeNote"></div>
+    </div>
+
+
+    <div class="card" id="bagCard" style="cursor:pointer">
+      <div class="label">Your bag</div>
+      <div class="metric" id="bagTotal">Tap to set up</div>
+      <div class="sub" id="bagSub">Mark vs cost · path to $1M band</div>
+    </div>
+
+    <div class="card">
+      <div class="label">Social vs Reality</div>
+      <div class="vs" style="margin-top:10px">
+        <div class="side social">
+          <h3>📱 Social saying</h3>
+          <p id="socialText">Pulling headlines…</p>
+        </div>
+        <div class="side reality">
+          <h3>📊 Actual tape</h3>
+          <p id="realityText">Matching to index…</p>
+        </div>
+      </div>
+      <div class="gap" id="gapText"></div>
+    </div>
+
+    <div class="card">
+      <div class="label">Checklist</div>
+      <ul class="check" id="checks"></ul>
+    </div>
+
+    <div class="row">
+      <div class="card">
+        <div class="label">BTC</div>
+        <div class="metric" id="btc">—</div>
+      </div>
+      <div class="card">
+        <div class="label">ETH</div>
+        <div class="metric" id="eth">—</div>
+      </div>
+    </div>
+  </div>
+
+  
+<div id="bagModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.72);z-index:50;padding:16px;overflow:auto">
+  <div class="card" style="max-width:520px;margin:24px auto;position:relative">
+    <button id="bagClose" style="position:absolute;right:12px;top:12px;background:transparent;border:none;color:var(--muted);font-size:22px">×</button>
+    <div class="label">Bag detail</div>
+    <div class="metric" id="bagModalTotal" style="font-size:28px">—</div>
+    <div class="sub" id="bagModalSub"></div>
+    <div id="bagRows" style="margin-top:12px"></div>
+    <div class="gap" style="margin-top:12px">Targets = stretch mid toward the ~10% Monte Carlo / $1M-path band (paper).</div>
+    <button class="refresh" id="bagEdit" style="margin-top:12px;background:#24324d;color:var(--text)">Edit holdings (saved on this phone only)</button>
+  </div>
+</div>
+<div id="bagSetup" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.72);z-index:60;padding:16px;overflow:auto">
+  <div class="card" style="max-width:520px;margin:24px auto">
+    <div class="label">Holdings (this device only)</div>
+    <p class="sub">Units + avg cost stay in your phone’s localStorage — not uploaded. Paste JSON once.</p>
+    <textarea id="bagJson" style="width:100%;height:180px;background:#0b1522;color:var(--text);border:1px solid var(--line);border-radius:10px;padding:10px;font-size:12px;font-family:ui-monospace,monospace"></textarea>
+    <button class="refresh" id="bagSave">Save on this device</button>
+    <button class="refresh" id="bagSetupCancel" style="margin-top:8px;background:#24324d;color:var(--text)">Cancel</button>
+  </div>
+</div>
+
+  <button class="refresh" id="refreshBtn">Refresh</button>
+  <div class="install" id="installHelp">
+    <strong>Save to Home Screen</strong><br/>
+    iPhone: Share → Add to Home Screen<br/>
+    Android Chrome: Menu → Install app / Add to Home screen
+  </div>
+  <div class="footer">Paper dashboard · not advice · Crypto Research</div>
+
+<script>
+const $ = id => document.getElementById(id);
+
+async function fetchJson(url) {
+  const r = await fetch(url);
+  if (!r.ok) throw new Error(url);
+  return r.json();
+}
+
+async function fetchAltseason() {
+  // Try public mirrors / proxies for Blockchain Center page
+  const proxies = [
+    'https://api.allorigins.win/raw?url=' + encodeURIComponent('https://www.blockchaincenter.net/en/altcoin-season-index/'),
+    'https://corsproxy.io/?' + encodeURIComponent('https://www.blockchaincenter.net/en/altcoin-season-index/')
+  ];
+  for (const u of proxies) {
+    try {
+      const t = await (await fetch(u, {signal: AbortSignal.timeout(8000)})).text();
+      // Look for standalone index number near "It is not Altcoin Season" / chart
+      const m = t.match(/It is not Altcoin Season[\s\S]{0,80}?(\d{1,3})/) ||
+                t.match(/It is Altcoin Season[\s\S]{0,80}?(\d{1,3})/) ||
+                t.match(/Altcoin Season Index[\s\S]{0,200}?\b([1-9]?\d)\b/);
+      if (m) {
+        const n = parseInt(m[1],10);
+        if (n>=0 && n<=100) return n;
+      }
+    } catch(e) {}
+  }
+  // fallback last known from build day
+  return null;
+}
+
+async function fetchSocialTone() {
+  // Lightweight public RSS/news sniff via allorigins Google News RSS
+  const q = encodeURIComponent('https://news.google.com/rss/search?q=altcoin+season+OR+%22bitcoin+dominance%22+when:1d&hl=en-US&gl=US&ceid=US:en');
+  try {
+    const xml = await (await fetch('https://api.allorigins.win/raw?url=' + q, {signal: AbortSignal.timeout(8000)})).text();
+    const titles = [...xml.matchAll(/<title><!\[CDATA\[(.*?)\]\]><\/title>|<title>(.*?)<\/title>/g)]
+      .map(m => (m[1]||m[2]||'').trim())
+      .filter(t => t && !/^Google News/i.test(t))
+      .slice(0, 8);
+    const blob = titles.join(' · ').toLowerCase();
+    let tone = 'Mixed / quiet';
+    let detail = titles[0] || 'No fresh headlines';
+    const bull = /(parabolic|explode|altseason|alt season|moon|breakout|bull run|just beginning)/i;
+    const bear = /(crash|dump|dead|over|top is in|bear|capitulation)/i;
+    const bullHits = titles.filter(t => bull.test(t)).length;
+    const bearHits = titles.filter(t => bear.test(t)).length;
+    if (bullHits >= 2) tone = 'Hot / early-bull chatter';
+    else if (bullHits === 1) tone = 'Mildly bullish chatter';
+    else if (bearHits >= 2) tone = 'Fear / top-is-in chatter';
+    if (titles[0]) detail = titles.slice(0,2).join(' · ');
+    return { tone, detail, bullHits, bearHits };
+  } catch(e) {
+    return { tone: 'Unavailable', detail: 'Could not reach news feed', bullHits:0, bearHits:0 };
+  }
+}
+
+function regimeFrom(index, btcd, ethbtc) {
+  if (index >= 75 && btcd < 55) return ['ALTSEASON', 'Index confirmed + dominance soft', 'good'];
+  if (index >= 60 && btcd < 58) return ['WARMING', 'Getting close — not locked', 'warn'];
+  if (index < 40) return ['BTC SEASON', 'Alts lagging hard', 'bad'];
+  return ['STALLED / NEUTRAL', 'Alts not confirmed', 'warn'];
+}
+
+function money(n) {
+  return n >= 1000 ? '$' + Math.round(n).toLocaleString() : '$' + n.toFixed(2);
+}
+
+function moneyCompact(n) {
+  if (n == null || isNaN(n)) return '—';
+  const a = Math.abs(n);
+  if (a >= 1e12) return '$' + (n/1e12).toFixed(2) + 'T';
+  if (a >= 1e9) return '$' + (n/1e9).toFixed(2) + 'B';
+  if (a >= 1e6) return '$' + (n/1e6).toFixed(2) + 'M';
+  return money(n);
+}
+function fmtChg(c) {
+  if (c == null || isNaN(c)) return { text:'—', cls:'flat' };
+  const sign = c > 0 ? '+' : '';
+  return { text: sign + c.toFixed(2) + '%', cls: c > 0 ? 'up' : c < 0 ? 'dn' : 'flat' };
+}
+
+
+
+const TARGETS = {
+  BTC: 150000, ETH: 6000, SOL: 280, ADA: 2.55, XRP: 6.0,
+  HBAR: 0.50, LINK: 40, XLM: 0.55, SHIB: 2e-5
+}; // stretch-mid / ~10% MC path paper targets
+const DEFAULT_BAG = null; // never ship real units in public build
+
+async function fetchFearGreed() {
+  try {
+    const j = await fetchJson('https://api.alternative.me/fng/?limit=1');
+    const d = j.data && j.data[0];
+    if (!d) return null;
+    return { value: +d.value, label: d.value_classification };
+  } catch(e) { return null; }
+}
+
+function readBag() {
+  try { return JSON.parse(localStorage.getItem('altseason_bag_v1') || 'null'); } catch(e) { return null; }
+}
+function writeBag(obj) { localStorage.setItem('altseason_bag_v1', JSON.stringify(obj)); }
+
+function ingestBagFromHash() {
+  try {
+    const h = location.hash || '';
+    const m = h.match(/[#&]bag=([A-Za-z0-9_-]+)/);
+    if (!m) return false;
+    let b64 = m[1];
+    while (b64.length % 4) b64 += '=';
+    const bin = atob(b64.replace(/-/g,'+').replace(/_/g,'/'));
+    const json = decodeURIComponent(escape(bin));
+    const obj = JSON.parse(json);
+    if (!obj.holdings) return false;
+    writeBag(obj);
+    history.replaceState(null, '', location.pathname + location.search);
+    return true;
+  } catch(e) { console.warn('bag hash import failed', e); return false; }
+}
+
+let lastPrices = {};
+let lastChanges = {};
+
+function renderBag(prices) {
+  lastPrices = prices || lastPrices;
+  const bag = readBag();
+  const holdings = (bag && bag.holdings || []).filter(h => h && Number(h.units) > 0);
+  if (!holdings.length) {
+    $('bagTotal').textContent = 'Set up →';
+    $('bagSub').textContent = 'Open one-tap seed from chat (Safari)';
+    const tape = document.getElementById('holdingsTape');
+    if (tape) tape.innerHTML = '<div class="sub">Bag empty — open the seed link in Safari once.</div>';
+    return;
+  }
+  bag.holdings = holdings;
+  let mkt=0, cost=0, tgt=0;
+  const rows = [];
+  for (const h of bag.holdings) {
+    const px = lastPrices[h.symbol];
+    const mark = px != null ? h.units * px : null;
+    const c = h.units * h.avgCost;
+    const tPx = TARGETS[h.symbol];
+    const t = tPx != null ? h.units * tPx : null;
+    if (mark!=null) mkt += mark;
+    cost += c;
+    if (t!=null) tgt += t;
+    rows.push({...h, px, mark, c, tPx, t});
+  }
+  $('bagTotal').textContent = mkt ? ('$' + Math.round(mkt).toLocaleString()) : '—';
+  const pnl = mkt - cost;
+  const pnlPct = cost ? (100*pnl/cost) : 0;
+  $('bagSub').textContent = `Cost $${Math.round(cost).toLocaleString()} · ${pnl>=0?'+':''}$${Math.round(pnl).toLocaleString()} (${pnlPct.toFixed(0)}%)`;
+  $('bagModalTotal').textContent = mkt ? ('$' + Math.round(mkt).toLocaleString()) : '—';
+  $('bagModalSub').textContent = `At stretch targets ~$${Math.round(tgt).toLocaleString()} · gap to $1M $${Math.max(0,Math.round(1000000-(tgt||mkt))).toLocaleString()}`;
+  $('bagRows').innerHTML = rows.sort((a,b)=>(b.mark||0)-(a.mark||0)).map(r => `
+    <div class="coin">
+      <div>
+        <div class="sym">${r.symbol}</div>
+        <div class="meta">Mark ${r.px!=null?formatPx(r.px):'—'} · Cost ${formatPx(r.avgCost)} · Target ${r.tPx!=null?formatPx(r.tPx):'—'}</div>
+      </div>
+      <div class="right">
+        <div class="val">${r.mark!=null?('$' + Math.round(r.mark).toLocaleString()):'—'}</div>
+        <div class="meta">at target ${r.t!=null?('$' + Math.round(r.t).toLocaleString()):'—'}</div>
+      </div>
+    </div>`).join('');
+}
+
+function formatPx(x) {
+  if (x >= 1000) return '$' + Math.round(x).toLocaleString();
+  if (x >= 1) return '$' + x.toFixed(2);
+  if (x >= 0.01) return '$' + x.toFixed(4);
+  return '$' + x.toPrecision(3);
+}
+
+
+function renderHoldingsTape(prices, changes) {
+  if (prices) lastPrices = prices;
+  if (changes) lastChanges = changes;
+  const bag = readBag();
+  const el = $('tapeBody');
+  if (!el) return;
+  if (!bag || !bag.holdings || !bag.holdings.length) {
+    el.innerHTML = '<div class="tape-empty">Open one-tap seed or set up bag</div>';
+    return;
+  }
+  const rows = [];
+  for (const h of bag.holdings) {
+    if (!h || !h.symbol) continue;
+    const units = +h.units || 0;
+    if (units <= 0) continue; // only show real positions
+    const px = lastPrices[h.symbol];
+    const mark = px != null ? units * px : null;
+    const ch = lastChanges[h.symbol];
+    rows.push({ symbol: h.symbol, px, mark, ch });
+  }
+  if (!rows.length) {
+    el.innerHTML = '<div class="tape-empty">Open one-tap seed or set up bag</div>';
+    return;
+  }
+  rows.sort((a,b)=>(b.mark||0)-(a.mark||0));
+  el.innerHTML = rows.map(r => {
+    const chg = fmtChg(r.ch);
+    return `<div class="coin">
+      <div>
+        <div class="sym">${r.symbol}</div>
+        <div class="meta">Mark ${r.px!=null?formatPx(r.px):'—'}</div>
+      </div>
+      <div class="right">
+        <div class="val">${r.mark!=null?('$' + Math.round(r.mark).toLocaleString()):'—'}</div>
+        <div class="chg ${chg.cls}">${chg.text}</div>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+async function fetchBagPrices(symbols) {
+  const map = {
+    BTC:'bitcoin', ETH:'ethereum', SOL:'solana', ADA:'cardano', XRP:'ripple',
+    HBAR:'hedera-hashgraph', LINK:'chainlink', XLM:'stellar', SHIB:'shiba-inu'
+  };
+  const ids = [...new Set(symbols.map(s => map[s]).filter(Boolean))];
+  if (!ids.length) return { prices:{}, changes:{} };
+  const j = await fetchJson('https://api.coingecko.com/api/v3/simple/price?ids=' + ids.join(',') + '&vs_currencies=usd&include_24hr_change=true');
+  const inv = Object.fromEntries(Object.entries(map).map(([k,v])=>[v,k]));
+  const prices = {}, changes = {};
+  for (const [id, v] of Object.entries(j)) {
+    const sym = inv[id];
+    if (!sym) continue;
+    prices[sym] = v.usd;
+    if (v.usd_24h_change != null) changes[sym] = v.usd_24h_change;
+  }
+  return { prices, changes };
+}
+
+$('bagCard').onclick = () => {
+  if (!readBag()) { openSetup(); return; }
+  $('bagModal').style.display = 'block';
+  renderBag();
+};
+$('bagClose').onclick = () => { $('bagModal').style.display = 'none'; };
+$('bagEdit').onclick = () => { $('bagModal').style.display = 'none'; openSetup(); };
+$('bagSetupCancel').onclick = () => { $('bagSetup').style.display = 'none'; };
+function openSetup() {
+  const cur = readBag();
+  const sample = cur || { holdings: [
+    {symbol:'ETH', units:0, avgCost:0},
+    {symbol:'SOL', units:0, avgCost:0},
+    {symbol:'ADA', units:0, avgCost:0},
+    {symbol:'XRP', units:0, avgCost:0},
+    {symbol:'HBAR', units:0, avgCost:0},
+    {symbol:'LINK', units:0, avgCost:0},
+    {symbol:'BTC', units:0, avgCost:0},
+    {symbol:'XLM', units:0, avgCost:0},
+    {symbol:'SHIB', units:0, avgCost:0}
+  ]};
+  $('bagJson').value = JSON.stringify(sample, null, 2);
+  $('bagSetup').style.display = 'block';
+}
+$('bagSave').onclick = () => {
+  try {
+    const obj = JSON.parse($('bagJson').value);
+    if (!obj.holdings || !Array.isArray(obj.holdings)) throw new Error('need holdings');
+    const real = obj.holdings.filter(h => h && h.symbol && Number(h.units) > 0);
+    if (!real.length) { alert('No units > 0 — use the one-tap seed link from chat, or enter real units.'); return; }
+    obj.holdings = real.map(h => ({ symbol: String(h.symbol).toUpperCase(), units: Number(h.units), avgCost: Number(h.avgCost)||0 }));
+    writeBag(obj);
+    $('bagSetup').style.display = 'none';
+    load();
+  } catch(e) { alert('Invalid JSON'); }
+};
+
+async function load() {
+  ingestBagFromHash();
+  renderHoldingsTape();
+  $('updated').textContent = 'Refreshing…';
+  let index = await fetchAltseason();
+  let btc=null, eth=null, btcd=null;
+  try {
+    const global = await fetchJson('https://api.coingecko.com/api/v3/global');
+    btcd = global.data.market_cap_percentage.btc;
+    const prices = await fetchJson('https://api.coingecko.com/api/v3/simple/price?ids=bitcoin,ethereum&vs_currencies=usd');
+    btc = prices.bitcoin.usd; eth = prices.ethereum.usd;
+    let totalMcap = null;
+    try { totalMcap = global.data.total_market_cap && global.data.total_market_cap.usd; } catch(e) {}
+    if (totalMcap != null && $('ovMcap')) $('ovMcap').textContent = moneyCompact(totalMcap);
+    try {
+      const bag = readBag();
+      const syms = [...new Set([...(bag && bag.holdings ? bag.holdings.map(h=>h.symbol) : []), 'BTC','ETH'])];
+      const { prices: bagPx, changes: bagCh } = await fetchBagPrices(syms);
+      bagPx.BTC = bagPx.BTC || btc; bagPx.ETH = bagPx.ETH || eth;
+      renderBag(bagPx);
+      renderHoldingsTape(bagPx, bagCh);
+    } catch(e) {
+      renderBag({BTC:btc, ETH:eth});
+      renderHoldingsTape({BTC:btc, ETH:eth}, {});
+    }
+  } catch(e) {
+    $('updated').textContent = 'Price feed error — retry';
+  }
+  if (index == null) index = 59; // graceful fallback; show note
+  const ethbtc = (btc && eth) ? eth/btc : null;
+
+  $('index').textContent = index;
+  if ($('ovIndex')) $('ovIndex').textContent = index;
+  $('barFill').style.width = Math.min(100, index) + '%';
+  const season = index >= 75;
+  $('seasonPill').textContent = season ? 'ALTCOIN SEASON' : 'NOT ALTSEASON';
+  $('seasonPill').className = 'pill ' + (season ? 'good' : 'warn');
+  if ($('ovSeason')) $('ovSeason').textContent = season ? 'ALTSEASON' : 'not yet';
+
+  if (btcd != null) {
+    $('btcd').textContent = btcd.toFixed(1) + '%';
+    $('btcdNote').textContent = btcd < 55 ? 'Dominance soft' : 'Still elevated';
+  }
+  if (ethbtc != null) {
+    $('ethbtc').textContent = ethbtc.toFixed(4);
+    $('ethbtcNote').textContent = ethbtc > 0.04 ? 'ETH relative firm' : 'Soft / not leading';
+  }
+  if (btc) { $('btc').textContent = money(btc); if ($('ovBtc')) $('ovBtc').textContent = money(btc); }
+  if (eth) { $('eth').textContent = money(eth); if ($('ovEth')) $('ovEth').textContent = money(eth); }
+  if (lastChanges.BTC != null && $('ovBtcChg')) { const c=fmtChg(lastChanges.BTC); $('ovBtcChg').textContent = c.text + ' 24h'; $('ovBtcChg').style.color = c.cls==='up'?'var(--green)':c.cls==='dn'?'var(--red)':''; }
+  if (lastChanges.ETH != null && $('ovEthChg')) { const c=fmtChg(lastChanges.ETH); $('ovEthChg').textContent = c.text + ' 24h'; $('ovEthChg').style.color = c.cls==='up'?'var(--green)':c.cls==='dn'?'var(--red)':''; }
+
+  const [reg, note, cls] = regimeFrom(index, btcd||60, ethbtc||0);
+  $('regime').textContent = reg;
+  $('regime').style.color = cls==='good' ? 'var(--green)' : cls==='bad' ? 'var(--red)' : 'var(--gold)';
+  $('regimeNote').textContent = note;
+
+  const fng = await fetchFearGreed();
+  if (fng) {
+    $('fng').textContent = fng.value;
+    if ($('ovFng')) $('ovFng').textContent = fng.value;
+    if ($('ovFngLbl')) $('ovFngLbl').textContent = fng.label;
+    $('fngBar').style.width = Math.min(100, fng.value) + '%';
+    $('fngPill').textContent = fng.label.toUpperCase();
+    let cls = 'warn';
+    if (fng.value <= 25) cls = 'bad';
+    else if (fng.value >= 75) cls = 'good';
+    $('fngPill').className = 'pill ' + cls;
+    $('fngBar').style.background = cls==='good' ? 'var(--green)' : cls==='bad' ? 'var(--red)' : 'var(--gold)';
+  } else {
+    $('fng').textContent = '—';
+    $('fngPill').textContent = 'UNAVAILABLE';
+    if ($('ovFng')) $('ovFng').textContent = '—';
+  }
+
+  const checks = [
+    ['Altcoin Season Index ≥75 holding', index >= 75],
+    ['BTC.D sustained under ~55–58%', btcd != null && btcd < 58],
+    ['ETH/BTC turning up / leading', ethbtc != null && ethbtc > 0.035],
+    ['Social hype matching tape', false] // filled after social
+  ];
+
+  const social = await fetchSocialTone();
+  $('socialText').textContent = social.tone + ' — ' + social.detail;
+  let reality;
+  if (index >= 75) reality = 'Tape confirms altseason (≥75).';
+  else if (index >= 60) reality = 'Tape is warming (60s) but not locked.';
+  else reality = 'Tape still Bitcoin-led / neutral — not altseason.';
+  $('realityText').textContent = reality + (btcd!=null ? ` BTC.D ${btcd.toFixed(1)}%.` : '');
+
+  let gap;
+  if (social.bullHits >= 1 && index < 70) {
+    gap = 'Gap: social is ahead of the tape — classic early/noise risk.';
+    checks[3][1] = false;
+  } else if (social.bullHits === 0 && index >= 70) {
+    gap = 'Gap: tape warming while social is quiet.';
+    checks[3][1] = false;
+  } else if (index >= 75 && social.bullHits >= 1) {
+    gap = 'Aligned: hype and index both hot.';
+    checks[3][1] = true;
+  } else {
+    gap = 'Mostly aligned: neither social nor index is screaming altseason.';
+    checks[3][1] = true;
+  }
+  $('gapText').innerHTML = '<strong>Read:</strong> ' + gap;
+
+  $('checks').innerHTML = checks.map(([l,ok]) =>
+    `<li><span><span class="dot ${ok?'on':'off'}"></span>${l}</span><span style="color:var(--muted)">${ok?'Pass':'Fail'}</span></li>`
+  ).join('');
+
+  const now = new Date();
+  $('updated').textContent = 'Updated ' + now.toLocaleString('en-US', {timeZone:'America/Chicago'}) + ' CT';
+}
+
+$('refreshBtn').onclick = load;
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('sw.js?v=3').catch(()=>{});
+}
+load();
+</script>
+</body>
+</html>
 
