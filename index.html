@@ -7,7 +7,7 @@
 <meta name="apple-mobile-web-app-capable" content="yes"/>
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"/>
 <meta name="apple-mobile-web-app-title" content="Altseason"/>
-<link rel="manifest" href="manifest.json"/>
+<link rel="manifest" href="manifest.json?v=3"/>
 <link rel="apple-touch-icon" href="apple-touch-icon.png"/>
 <title>Altseason Pulse</title>
 <style>
@@ -54,12 +54,36 @@
   .coin .right { text-align:right; }
   .coin .val { font-weight:700; font-size:15px; }
 
+  .overview { display:grid; grid-template-columns:repeat(5,minmax(0,1fr)); gap:8px; margin-bottom:12px; }
+  @media (max-width:720px){ .overview { grid-template-columns:repeat(3,minmax(0,1fr)); } }
+  @media (max-width:420px){ .overview { grid-template-columns:repeat(2,minmax(0,1fr)); } }
+  .ov { background:var(--card); border:1px solid var(--line); border-radius:12px; padding:10px 10px 12px; min-width:0; }
+  .ov .label { font-size:10px; }
+  .ov .ovv { font-size:15px; font-weight:800; margin-top:4px; line-height:1.15; word-break:break-word; }
+  .ov .ovs { color:var(--muted); font-size:10px; margin-top:2px; }
+  .tape-empty { color:var(--muted); font-size:13px; line-height:1.45; padding:4px 0; }
+  .tape .coin .chg { font-size:12px; font-weight:700; }
+  .chg.up { color:var(--green); } .chg.dn { color:var(--red); } .chg.flat { color:var(--muted); }
+
 </style>
 </head>
 <body>
   <div class="sub" id="updated">Loading…</div>
   <h1>Altseason Pulse</h1>
-  <div class="sub">Index · dominance · social vs reality</div>
+  <div class="sub">Index · dominance · social vs reality · overview</div>
+
+  <div class="overview" id="overview">
+    <div class="ov"><div class="label">Crypto Mcap</div><div class="ovv" id="ovMcap">—</div><div class="ovs">CoinGecko global</div></div>
+    <div class="ov"><div class="label">BTC</div><div class="ovv" id="ovBtc">—</div><div class="ovs" id="ovBtcChg">mark</div></div>
+    <div class="ov"><div class="label">ETH</div><div class="ovv" id="ovEth">—</div><div class="ovs" id="ovEthChg">mark</div></div>
+    <div class="ov"><div class="label">Altseason</div><div class="ovv" id="ovIndex">—</div><div class="ovs" id="ovSeason">index</div></div>
+    <div class="ov"><div class="label">Fear &amp; Greed</div><div class="ovv" id="ovFng">—</div><div class="ovs" id="ovFngLbl">…</div></div>
+  </div>
+
+  <div class="card" id="holdingsTape" style="margin-bottom:12px">
+    <div class="label">Holdings tape</div>
+    <div id="tapeBody" class="tape" style="margin-top:8px"><div class="tape-empty">Open one-tap seed or set up bag</div></div>
+  </div>
 
   <div class="grid">
     <div class="card">
@@ -235,6 +259,21 @@ function money(n) {
   return n >= 1000 ? '$' + Math.round(n).toLocaleString() : '$' + n.toFixed(2);
 }
 
+function moneyCompact(n) {
+  if (n == null || isNaN(n)) return '—';
+  const a = Math.abs(n);
+  if (a >= 1e12) return '$' + (n/1e12).toFixed(2) + 'T';
+  if (a >= 1e9) return '$' + (n/1e9).toFixed(2) + 'B';
+  if (a >= 1e6) return '$' + (n/1e6).toFixed(2) + 'M';
+  return money(n);
+}
+function fmtChg(c) {
+  if (c == null || isNaN(c)) return { text:'—', cls:'flat' };
+  const sign = c > 0 ? '+' : '';
+  return { text: sign + c.toFixed(2) + '%', cls: c > 0 ? 'up' : c < 0 ? 'dn' : 'flat' };
+}
+
+
 
 const TARGETS = {
   BTC: 150000, ETH: 6000, SOL: 280, ADA: 2.55, XRP: 6.0,
@@ -274,6 +313,7 @@ function ingestBagFromHash() {
 }
 
 let lastPrices = {};
+let lastChanges = {};
 
 function renderBag(prices) {
   lastPrices = prices || lastPrices;
@@ -322,18 +362,64 @@ function formatPx(x) {
   return '$' + x.toPrecision(3);
 }
 
+
+function renderHoldingsTape(prices, changes) {
+  if (prices) lastPrices = prices;
+  if (changes) lastChanges = changes;
+  const bag = readBag();
+  const el = $('tapeBody');
+  if (!el) return;
+  if (!bag || !bag.holdings || !bag.holdings.length) {
+    el.innerHTML = '<div class="tape-empty">Open one-tap seed or set up bag</div>';
+    return;
+  }
+  const rows = [];
+  for (const h of bag.holdings) {
+    if (!h || !h.symbol) continue;
+    const units = +h.units || 0;
+    if (units <= 0) continue; // only show real positions
+    const px = lastPrices[h.symbol];
+    const mark = px != null ? units * px : null;
+    const ch = lastChanges[h.symbol];
+    rows.push({ symbol: h.symbol, px, mark, ch });
+  }
+  if (!rows.length) {
+    el.innerHTML = '<div class="tape-empty">Open one-tap seed or set up bag</div>';
+    return;
+  }
+  rows.sort((a,b)=>(b.mark||0)-(a.mark||0));
+  el.innerHTML = rows.map(r => {
+    const chg = fmtChg(r.ch);
+    return `<div class="coin">
+      <div>
+        <div class="sym">${r.symbol}</div>
+        <div class="meta">Mark ${r.px!=null?formatPx(r.px):'—'}</div>
+      </div>
+      <div class="right">
+        <div class="val">${r.mark!=null?('$' + Math.round(r.mark).toLocaleString()):'—'}</div>
+        <div class="chg ${chg.cls}">${chg.text}</div>
+      </div>
+    </div>`;
+  }).join('');
+}
+
 async function fetchBagPrices(symbols) {
   const map = {
     BTC:'bitcoin', ETH:'ethereum', SOL:'solana', ADA:'cardano', XRP:'ripple',
     HBAR:'hedera-hashgraph', LINK:'chainlink', XLM:'stellar', SHIB:'shiba-inu'
   };
   const ids = [...new Set(symbols.map(s => map[s]).filter(Boolean))];
-  if (!ids.length) return {};
-  const j = await fetchJson('https://api.coingecko.com/api/v3/simple/price?ids=' + ids.join(',') + '&vs_currencies=usd');
+  if (!ids.length) return { prices:{}, changes:{} };
+  const j = await fetchJson('https://api.coingecko.com/api/v3/simple/price?ids=' + ids.join(',') + '&vs_currencies=usd&include_24hr_change=true');
   const inv = Object.fromEntries(Object.entries(map).map(([k,v])=>[v,k]));
-  const out = {};
-  for (const [id, v] of Object.entries(j)) out[inv[id]] = v.usd;
-  return out;
+  const prices = {}, changes = {};
+  for (const [id, v] of Object.entries(j)) {
+    const sym = inv[id];
+    if (!sym) continue;
+    prices[sym] = v.usd;
+    if (v.usd_24h_change != null) changes[sym] = v.usd_24h_change;
+  }
+  return { prices, changes };
 }
 
 $('bagCard').onclick = () => {
@@ -372,6 +458,7 @@ $('bagSave').onclick = () => {
 
 async function load() {
   ingestBagFromHash();
+  renderHoldingsTape();
   $('updated').textContent = 'Refreshing…';
   let index = await fetchAltseason();
   let btc=null, eth=null, btcd=null;
@@ -380,13 +467,20 @@ async function load() {
     btcd = global.data.market_cap_percentage.btc;
     const prices = await fetchJson('https://api.coingecko.com/api/v3/simple/price?ids=bitcoin,ethereum&vs_currencies=usd');
     btc = prices.bitcoin.usd; eth = prices.ethereum.usd;
+    let totalMcap = null;
+    try { totalMcap = global.data.total_market_cap && global.data.total_market_cap.usd; } catch(e) {}
+    if (totalMcap != null && $('ovMcap')) $('ovMcap').textContent = moneyCompact(totalMcap);
     try {
       const bag = readBag();
-      const syms = bag && bag.holdings ? bag.holdings.map(h=>h.symbol) : ['BTC','ETH'];
-      const bagPx = await fetchBagPrices(syms);
+      const syms = [...new Set([...(bag && bag.holdings ? bag.holdings.map(h=>h.symbol) : []), 'BTC','ETH'])];
+      const { prices: bagPx, changes: bagCh } = await fetchBagPrices(syms);
       bagPx.BTC = bagPx.BTC || btc; bagPx.ETH = bagPx.ETH || eth;
       renderBag(bagPx);
-    } catch(e) { renderBag({BTC:btc, ETH:eth}); }
+      renderHoldingsTape(bagPx, bagCh);
+    } catch(e) {
+      renderBag({BTC:btc, ETH:eth});
+      renderHoldingsTape({BTC:btc, ETH:eth}, {});
+    }
   } catch(e) {
     $('updated').textContent = 'Price feed error — retry';
   }
@@ -394,10 +488,12 @@ async function load() {
   const ethbtc = (btc && eth) ? eth/btc : null;
 
   $('index').textContent = index;
+  if ($('ovIndex')) $('ovIndex').textContent = index;
   $('barFill').style.width = Math.min(100, index) + '%';
   const season = index >= 75;
   $('seasonPill').textContent = season ? 'ALTCOIN SEASON' : 'NOT ALTSEASON';
   $('seasonPill').className = 'pill ' + (season ? 'good' : 'warn');
+  if ($('ovSeason')) $('ovSeason').textContent = season ? 'ALTSEASON' : 'not yet';
 
   if (btcd != null) {
     $('btcd').textContent = btcd.toFixed(1) + '%';
@@ -407,8 +503,10 @@ async function load() {
     $('ethbtc').textContent = ethbtc.toFixed(4);
     $('ethbtcNote').textContent = ethbtc > 0.04 ? 'ETH relative firm' : 'Soft / not leading';
   }
-  if (btc) $('btc').textContent = money(btc);
-  if (eth) $('eth').textContent = money(eth);
+  if (btc) { $('btc').textContent = money(btc); if ($('ovBtc')) $('ovBtc').textContent = money(btc); }
+  if (eth) { $('eth').textContent = money(eth); if ($('ovEth')) $('ovEth').textContent = money(eth); }
+  if (lastChanges.BTC != null && $('ovBtcChg')) { const c=fmtChg(lastChanges.BTC); $('ovBtcChg').textContent = c.text + ' 24h'; $('ovBtcChg').style.color = c.cls==='up'?'var(--green)':c.cls==='dn'?'var(--red)':''; }
+  if (lastChanges.ETH != null && $('ovEthChg')) { const c=fmtChg(lastChanges.ETH); $('ovEthChg').textContent = c.text + ' 24h'; $('ovEthChg').style.color = c.cls==='up'?'var(--green)':c.cls==='dn'?'var(--red)':''; }
 
   const [reg, note, cls] = regimeFrom(index, btcd||60, ethbtc||0);
   $('regime').textContent = reg;
@@ -418,6 +516,8 @@ async function load() {
   const fng = await fetchFearGreed();
   if (fng) {
     $('fng').textContent = fng.value;
+    if ($('ovFng')) $('ovFng').textContent = fng.value;
+    if ($('ovFngLbl')) $('ovFngLbl').textContent = fng.label;
     $('fngBar').style.width = Math.min(100, fng.value) + '%';
     $('fngPill').textContent = fng.label.toUpperCase();
     let cls = 'warn';
@@ -428,6 +528,7 @@ async function load() {
   } else {
     $('fng').textContent = '—';
     $('fngPill').textContent = 'UNAVAILABLE';
+    if ($('ovFng')) $('ovFng').textContent = '—';
   }
 
   const checks = [
@@ -471,7 +572,7 @@ async function load() {
 
 $('refreshBtn').onclick = load;
 if ('serviceWorker' in navigator) {
-  navigator.serviceWorker.register('sw.js').catch(()=>{});
+  navigator.serviceWorker.register('sw.js?v=3').catch(()=>{});
 }
 load();
 </script>
