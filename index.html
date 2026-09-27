@@ -84,6 +84,14 @@
     </div>
 
     <div class="card">
+      <div class="label">Fear &amp; Greed</div>
+      <div class="metric" id="fng">—</div>
+      <span class="pill warn" id="fngPill">…</span>
+      <div class="bar"><i id="fngBar"></i><span class="mark" style="left:50%"></span></div>
+      <div class="sub" style="margin:0">alternative.me · 0 extreme fear · 100 extreme greed</div>
+    </div>
+
+    <div class="card">
       <div class="label">Regime</div>
       <div class="metric" id="regime" style="color:var(--gold)">—</div>
       <div class="sub" id="regimeNote"></div>
@@ -234,10 +242,36 @@ const TARGETS = {
 }; // stretch-mid / ~10% MC path paper targets
 const DEFAULT_BAG = null; // never ship real units in public build
 
+async function fetchFearGreed() {
+  try {
+    const j = await fetchJson('https://api.alternative.me/fng/?limit=1');
+    const d = j.data && j.data[0];
+    if (!d) return null;
+    return { value: +d.value, label: d.value_classification };
+  } catch(e) { return null; }
+}
+
 function readBag() {
   try { return JSON.parse(localStorage.getItem('altseason_bag_v1') || 'null'); } catch(e) { return null; }
 }
 function writeBag(obj) { localStorage.setItem('altseason_bag_v1', JSON.stringify(obj)); }
+
+function ingestBagFromHash() {
+  try {
+    const h = location.hash || '';
+    const m = h.match(/[#&]bag=([A-Za-z0-9_-]+)/);
+    if (!m) return false;
+    let b64 = m[1];
+    while (b64.length % 4) b64 += '=';
+    const bin = atob(b64.replace(/-/g,'+').replace(/_/g,'/'));
+    const json = decodeURIComponent(escape(bin));
+    const obj = JSON.parse(json);
+    if (!obj.holdings) return false;
+    writeBag(obj);
+    history.replaceState(null, '', location.pathname + location.search);
+    return true;
+  } catch(e) { console.warn('bag hash import failed', e); return false; }
+}
 
 let lastPrices = {};
 
@@ -337,6 +371,7 @@ $('bagSave').onclick = () => {
 };
 
 async function load() {
+  ingestBagFromHash();
   $('updated').textContent = 'Refreshing…';
   let index = await fetchAltseason();
   let btc=null, eth=null, btcd=null;
@@ -379,6 +414,21 @@ async function load() {
   $('regime').textContent = reg;
   $('regime').style.color = cls==='good' ? 'var(--green)' : cls==='bad' ? 'var(--red)' : 'var(--gold)';
   $('regimeNote').textContent = note;
+
+  const fng = await fetchFearGreed();
+  if (fng) {
+    $('fng').textContent = fng.value;
+    $('fngBar').style.width = Math.min(100, fng.value) + '%';
+    $('fngPill').textContent = fng.label.toUpperCase();
+    let cls = 'warn';
+    if (fng.value <= 25) cls = 'bad';
+    else if (fng.value >= 75) cls = 'good';
+    $('fngPill').className = 'pill ' + cls;
+    $('fngBar').style.background = cls==='good' ? 'var(--green)' : cls==='bad' ? 'var(--red)' : 'var(--gold)';
+  } else {
+    $('fng').textContent = '—';
+    $('fngPill').textContent = 'UNAVAILABLE';
+  }
 
   const checks = [
     ['Altcoin Season Index ≥75 holding', index >= 75],
