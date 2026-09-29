@@ -7,7 +7,7 @@
 <meta name="apple-mobile-web-app-capable" content="yes"/>
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"/>
 <meta name="apple-mobile-web-app-title" content="Altseason"/>
-<link rel="manifest" href="manifest.json?v=3"/>
+<link rel="manifest" href="manifest.json?v=4"/>
 <link rel="apple-touch-icon" href="apple-touch-icon.png"/>
 <title>Altseason Pulse</title>
 <style>
@@ -346,17 +346,24 @@ function renderBag(prices) {
   $('bagSub').textContent = `Cost $${Math.round(cost).toLocaleString()} · ${pnl>=0?'+':''}$${Math.round(pnl).toLocaleString()} (${pnlPct.toFixed(0)}%)`;
   $('bagModalTotal').textContent = mkt ? ('$' + Math.round(mkt).toLocaleString()) : '—';
   $('bagModalSub').textContent = `At stretch targets ~$${Math.round(tgt).toLocaleString()} · gap to $1M $${Math.max(0,Math.round(1000000-(tgt||mkt))).toLocaleString()}`;
-  $('bagRows').innerHTML = rows.sort((a,b)=>(b.mark||0)-(a.mark||0)).map(r => `
+  $('bagRows').innerHTML = rows.sort((a,b)=>(b.mark||0)-(a.mark||0)).map(r => {
+    const linePnl = (r.mark!=null && r.c!=null) ? (r.mark - r.c) : null;
+    const linePct = (linePnl!=null && r.c) ? (100*linePnl/r.c) : null;
+    const pnlCls = linePnl==null ? 'flat' : (linePnl>0 ? 'up' : linePnl<0 ? 'dn' : 'flat');
+    const pnlTxt = linePnl==null ? '—' : `${linePnl>=0?'+':''}$${Math.round(linePnl).toLocaleString()} (${linePct>=0?'+':''}${linePct.toFixed(1)}%)`;
+    return `
     <div class="coin">
       <div>
         <div class="sym">${r.symbol}</div>
-        <div class="meta">Mark ${r.px!=null?formatPx(r.px):'—'} · Cost ${formatPx(r.avgCost)} · Target ${r.tPx!=null?formatPx(r.tPx):'—'}</div>
+        <div class="meta">Mark ${r.px!=null?formatPx(r.px):'—'} · Avg cost ${formatPx(r.avgCost)} · Target ${r.tPx!=null?formatPx(r.tPx):'—'}</div>
       </div>
       <div class="right">
         <div class="val">${r.mark!=null?('$' + Math.round(r.mark).toLocaleString()):'—'}</div>
+        <div class="chg ${pnlCls}">${pnlTxt}</div>
         <div class="meta">at target ${r.t!=null?('$' + Math.round(r.t).toLocaleString()):'—'}</div>
       </div>
-    </div>`).join('');
+    </div>`;
+  }).join('');
 }
 
 function formatPx(x) {
@@ -382,10 +389,14 @@ function renderHoldingsTape(prices, changes) {
     if (!h || !h.symbol) continue;
     const units = +h.units || 0;
     if (units <= 0) continue; // only show real positions
+    const avgCost = +h.avgCost || 0;
     const px = lastPrices[h.symbol];
     const mark = px != null ? units * px : null;
+    const cost = units * avgCost;
+    const linePnl = mark != null ? mark - cost : null;
+    const linePct = (linePnl != null && cost) ? (100 * linePnl / cost) : null;
     const ch = lastChanges[h.symbol];
-    rows.push({ symbol: h.symbol, px, mark, ch });
+    rows.push({ symbol: h.symbol, px, mark, avgCost, cost, linePnl, linePct, ch });
   }
   if (!rows.length) {
     el.innerHTML = '<div class="tape-empty">Open one-tap seed or set up bag</div>';
@@ -394,14 +405,18 @@ function renderHoldingsTape(prices, changes) {
   rows.sort((a,b)=>(b.mark||0)-(a.mark||0));
   el.innerHTML = rows.map(r => {
     const chg = fmtChg(r.ch);
+    const pnlCls = r.linePnl==null ? 'flat' : (r.linePnl>0 ? 'up' : r.linePnl<0 ? 'dn' : 'flat');
+    const pnlTxt = r.linePnl==null ? '—' : `${r.linePnl>=0?'+':''}$${Math.round(r.linePnl).toLocaleString()} (${r.linePct>=0?'+':''}${r.linePct.toFixed(1)}%)`;
+    const chgHtml = (r.ch!=null && !isNaN(r.ch)) ? `<div class="chg ${chg.cls}">24h ${chg.text}</div>` : '';
     return `<div class="coin">
       <div>
         <div class="sym">${r.symbol}</div>
-        <div class="meta">Mark ${r.px!=null?formatPx(r.px):'—'}</div>
+        <div class="meta">Mark ${r.px!=null?formatPx(r.px):'—'} · Avg cost ${formatPx(r.avgCost)}</div>
       </div>
       <div class="right">
         <div class="val">${r.mark!=null?('$' + Math.round(r.mark).toLocaleString()):'—'}</div>
-        <div class="chg ${chg.cls}">${chg.text}</div>
+        <div class="chg ${pnlCls}">${pnlTxt}</div>
+        ${chgHtml}
       </div>
     </div>`;
   }).join('');
@@ -579,10 +594,9 @@ async function load() {
 
 $('refreshBtn').onclick = load;
 if ('serviceWorker' in navigator) {
-  navigator.serviceWorker.register('sw.js?v=3').catch(()=>{});
+  navigator.serviceWorker.register('sw.js?v=4').catch(()=>{});
 }
 load();
 </script>
 </body>
 </html>
-
